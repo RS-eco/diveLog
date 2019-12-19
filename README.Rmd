@@ -1,0 +1,124 @@
+---
+title: "diveLog - A digital scuba diving logbook"
+output: github_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(comment = NA, warning=F, message=F, 
+                      fig.path="figures/", dpi = 300)
+```
+
+**Note:** This repository is still very much work in progress!!!  
+
+<!--
+Dive qualifications:
+
+Dive medicals:
+-->
+
+## Read Logbook
+
+```{r}
+library(XML)
+
+# Load XML data
+xmlfile <- xmlParse("data/logbook.xml")
+#class(xmlfile)
+
+xmltop <- xmlRoot(xmlfile) #gives content of root
+#class(xmltop) #"XMLInternalElementNode" "XMLInternalNode" "XMLAbstractNode"
+# print(xmltop)[1]
+
+# To extract the XML-values from the document use xmlSApply
+logbook <- xmlSApply(xmltop, function(x) xmlSApply(x, xmlAttrs))
+
+# Get the first element of the first node.
+# print(xmltop[[1]][[1]])
+
+# Turn data into data.frame
+settings <- lapply(logbook[[1]], function(x) data.frame(t(x)))
+settings <- dplyr::bind_rows(settings)
+
+# Get the fifth element of the second node.
+# print(xmltop[[2]][[5]])
+
+divesites <- lapply(logbook[[2]], function(x) data.frame(t(x)))
+divesites <- dplyr::bind_rows(divesites)
+
+# Get the second element of the third node.
+# print(xmltop[[3]][[2]])
+
+dives <- lapply(logbook[[3]], function(x) data.frame(t(x)))
+dives <- dplyr::bind_rows(dives)
+```
+
+## Dive sites
+
+Total number of dive sites: `r length(unique(divesites$name))`  
+
+<!--
+Countries where I have been diving: 
+Oceans where I have been diving:
+Number of dives per dive site:
+-->
+
+```{r divesites, fig.width=10, fig.height=5}
+data(countriesHigh, package="rworldxtra")
+
+divesites <- tidyr::separate(divesites, gps, into=c("lat", "long"), sep=" ", remove=F)
+divesites <- tidyr::drop_na(divesites, c(lat, long))
+divesites$long <- as.numeric(divesites$long)
+divesites$lat <- as.numeric(divesites$lat)
+sp::coordinates(divesites) <- ~long+lat
+sp::proj4string(divesites) <- sp::proj4string(countriesHigh)
+sp::plot(countriesHigh)
+sp::plot(divesites, add=T, col="red")
+```
+
+```{r, eval=F, echo=F}
+library(sp); library(raster)
+study_area <- extent(-122.6823,-61.60182,4.923703,24.26082)
+plot(countriesHigh)
+plot(study_area, add=TRUE, col="red")
+```
+
+```{r, eval=F, echo=F}
+study_site <- extent(-85.3486, -68.4732, 5.340596, 19.23604)
+plot(countriesHigh, xlim=c(-122.6823, -61.60182), ylim=c(4.923703, 24.26082))
+plot(study_area, col="red", add=TRUE)
+plot(study_site, add=TRUE, col="pink")
+```
+
+## Dive logs
+
+<!-- Some durations are wrong -->
+
+```{r}
+dives$date <- lubridate::as_date(dives$date)
+dives$minutes <- sapply(sub(" min", "", dives$duration), function(x) strsplit(x, split="[:]")[[1]][1])
+dives$seconds <- sapply(sub(" min", "", dives$duration), function(x) strsplit(x, split="[:]")[[1]][2])
+```
+
+Total number of dives: `r nrow(dives)`  
+Date of first dive: `r min(dives$date)`  
+Date of last dive: `r max(dives$date)`  
+
+<!--
+Number of dives in fresh water:
+Number of dives in salt water:
+-->
+
+<!-- Additional info is still missing ! -->
+
+<!-- 
+Deepest depth: `r max(dives$depth)`
+-->
+
+Longest dive: `r max(dives$minutes, na.rm=T)`  
+
+<!--
+Temperature range:
+SAC rate:
+-->
